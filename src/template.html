@@ -1,0 +1,928 @@
+<style>
+:root{
+  color-scheme: light;
+  --bg:#faf7f1; --ink:#15130f; --mut:#6b6459; --line:#d9d2c6;
+  --blue:#2d6cdf; --orange:#e8632a; --plum:#7a4a9e;
+  --green:#5a7d3a; --red:#b2452c; --olive:#8a7a3c; --steel:#3d6a9c;
+  --fs:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+}
+*{box-sizing:border-box}
+.wrap{background:var(--bg); color:var(--ink); font-family:var(--fs); padding:0; margin:0 auto; max-width:1220px}
+.deck{position:relative}
+.slide{display:none; padding:26px 28px 34px}
+.slide.on{display:block}
+
+.topbar{display:flex; align-items:center; gap:14px; padding:14px 28px 0; flex-wrap:wrap}
+.pill{font-size:11.5px; letter-spacing:.09em; text-transform:uppercase; color:var(--mut); font-weight:650}
+.dots{display:flex; gap:7px; margin-left:auto; flex-wrap:wrap}
+.dot{width:10px;height:10px;border-radius:50%;background:#ded7ca;border:none;cursor:pointer;padding:0}
+.dot.on{background:var(--ink)}
+.navbtn{border:1px solid var(--line); background:#fff; color:var(--ink); border-radius:7px;
+  padding:5px 11px; font-size:13px; cursor:pointer; font-family:var(--fs); font-weight:600}
+.navbtn:hover{background:#f1ece2}
+.navbtn[disabled]{opacity:.35; cursor:default}
+
+h1{font-size:34px; line-height:1.08; margin:4px 0 8px; letter-spacing:-.025em; font-weight:800}
+h2{font-size:26px; line-height:1.12; margin:4px 0 7px; letter-spacing:-.02em; font-weight:800}
+h3{font-size:14px; margin:22px 0 8px; letter-spacing:.06em; text-transform:uppercase; color:var(--mut); font-weight:700}
+.sub{font-size:15.5px; color:#4a443b; margin:0 0 16px; max-width:880px; line-height:1.5}
+.tiny{font-size:12.5px; color:var(--mut); line-height:1.6}
+p{margin:0 0 11px}
+
+.legend{display:flex; gap:20px; flex-wrap:wrap; align-items:center; margin:0 0 10px; font-size:13.5px}
+.key{display:inline-flex; align-items:center; gap:7px; cursor:pointer; user-select:none}
+.key.off{opacity:.33}
+.sw{width:12px;height:12px;border-radius:3px;display:inline-block}
+
+.chartbox{overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch;
+  border:1px solid var(--line); border-radius:10px; background:#fffdf9}
+.chartbox svg{display:block; min-width:900px; width:100%; height:auto}
+.gridwrap{display:grid; grid-template-columns:repeat(auto-fit,minmax(252px,1fr)); gap:12px}
+.gridwrap .chartbox svg{min-width:0}
+
+table{border-collapse:collapse; width:100%; font-size:13px}
+th,td{text-align:right; padding:5px 8px; border-bottom:1px solid #e8e2d6; white-space:nowrap}
+th{font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--mut); font-weight:700}
+td.l,th.l{text-align:left}
+td.tk{font-weight:700}
+.cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:16px}
+table.lb{table-layout:fixed; width:100%}
+.cards-wide{display:grid; grid-template-columns:repeat(auto-fit,minmax(620px,1fr)); gap:16px}
+table.lb th,table.lb td{padding:5px 5px}
+table.lb td.nm{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+table.lb td.nm .tiny{color:var(--mut)}
+table.lb td.sc{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.card{border:1px solid var(--line); border-radius:10px; padding:13px 14px; background:#fffdf9}
+.card h4{margin:0 0 2px; font-size:16px; letter-spacing:-.01em}
+.card .cd{font-size:12.5px; color:var(--mut); margin:0 0 9px}
+.bv h4{color:var(--green)} .pr h4{color:var(--steel)} .bd h4{color:var(--olive)} .bad h4{color:var(--red)}
+
+.tip{position:fixed; z-index:50; pointer-events:none; background:#fffdf9; border:1px solid #bdb5a6;
+  border-radius:9px; padding:9px 11px; font-size:12.5px; box-shadow:0 7px 22px rgba(0,0,0,.17);
+  max-width:268px; display:none; line-height:1.45}
+.tip b{font-size:13.5px}
+.tip .row{display:flex; justify-content:space-between; gap:12px}
+.tip .row span:last-child{font-variant-numeric:tabular-nums; font-weight:650}
+.note{background:#f3eee3; border-left:3px solid var(--line); padding:10px 13px; border-radius:0 7px 7px 0;
+  font-size:13px; color:#4a443b; line-height:1.55; margin:14px 0}
+.foot{font-size:11.5px; color:var(--mut); margin-top:14px; line-height:1.6}
+ul{margin:0 0 11px; padding-left:19px} li{margin-bottom:5px; line-height:1.5}
+.src{font-weight:650}
+</style>
+
+<div class="wrap">
+  <div class="topbar">
+    <button class="navbtn" id="prev">&larr;</button>
+    <button class="navbtn" id="next">&rarr;</button>
+    <span class="pill" id="label"></span>
+    <div class="dots" id="dots"></div>
+  </div>
+  <div class="deck" id="deck"></div>
+</div>
+<div class="tip" id="tip"></div>
+
+<script>
+const DATA = /*__DATA__*/;
+const FWD = /*__FWD__*/;
+const S = DATA.sectors, ST = DATA.stocks;
+const FR = FWD.rows.filter(r=>r.modelled);
+const FBY = {}; FWD.rows.forEach(r=>FBY[r.t]=r);
+const MED_PE = DATA.medianPE;
+const SECCOL = {IT:"#2d6cdf", CS:"#7a4a9e", CD:"#e8632a", CST:"#c9a227", FIN:"#2f7d6b",
+  HC:"#b2452c", ENE:"#5a5248", IND:"#3d6a9c", MAT:"#8a7a3c", RE:"#a0527f", UTL:"#5a7d3a"};
+const IDXCOL = {sp:"#2d6cdf", ndx:"#e8632a", both:"#7a4a9e"};
+const IDXLAB = {sp:"S&P 500 only", ndx:"Nasdaq-100 only", both:"In both indexes"};
+const PE_CAP = 450;
+const fmtB = v => v==null? "\u2014" : (v>=1000? "$"+(v/1000).toFixed(2)+"T" : "$"+v.toFixed(v<10?2:1)+"B");
+const pc = v => v==null? "\u2014" : (v>0?"+":"")+v.toFixed(1)+"%";
+const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;");
+
+/* ---------- tooltip ---------- */
+const tip = document.getElementById("tip");
+function tipHTML(d){
+  const rows = [
+    ["Sector", S[d.s]],
+    ["Market cap", fmtB(d.mc)],
+    ["Trailing P/E", d.pe>PE_CAP? d.pe.toFixed(0)+" (off scale)" : d.pe.toFixed(1)],
+    ["Revenue (TTM)", fmtB(d.rev)],
+    ["Net income (TTM)", fmtB(d.ni)],
+    ["Net margin", d.mg.toFixed(1)+"%"],
+    ["Margin percentile", d.q.toFixed(0)+"th"],
+    ["Return 1y / 5y / 10y", [d.r1,d.r5,d.r10].map(x=>x==null?"\u2014":x.toFixed(0)+"%").join(" / ")]
+  ];
+  return "<b>"+esc(d.t)+"</b> &nbsp;"+esc(d.n)+"<div style='height:6px'></div>"+
+    rows.map(r=>"<div class='row'><span>"+r[0]+"</span><span>"+r[1]+"</span></div>").join("")+
+    "<div style='margin-top:6px;color:#6b6459;font-size:11.5px'>"+IDXLAB[d.i]+"</div>";
+}
+function showTip(e,d){ tip.innerHTML=tipHTML(d); tip.style.display="block"; moveTip(e); }
+function moveTip(e){
+  const r=tip.getBoundingClientRect();
+  let x=e.clientX+15, y=e.clientY+15;
+  if(x+r.width>innerWidth-8) x=e.clientX-r.width-15;
+  if(y+r.height>innerHeight-8) y=e.clientY-r.height-15;
+  tip.style.left=Math.max(6,x)+"px"; tip.style.top=Math.max(6,y)+"px";
+}
+function hideTip(){ tip.style.display="none"; }
+
+/* ---------- svg helpers ---------- */
+const NS="http://www.w3.org/2000/svg";
+function el(t,a,txt){ const n=document.createElementNS(NS,t);
+  for(const k in a) n.setAttribute(k,a[k]);
+  if(txt!=null) n.textContent=txt; return n; }
+
+function attachHover(node,d){
+  // forward-model rows carry .modelled and get the projection tooltip instead
+  node.addEventListener("mouseenter",e=>{
+    if(d && d.modelled!==undefined){ tip.innerHTML=ftip(d); tip.style.display="block"; moveTip(e); }
+    else showTip(e,d);
+    node.setAttribute("stroke","#15130f"); node.setAttribute("stroke-width","1.6"); });
+  node.addEventListener("mousemove",moveTip);
+  node.addEventListener("mouseleave",()=>{ hideTip(); node.setAttribute("stroke","#fffdf9"); node.setAttribute("stroke-width","0.8"); });
+}
+
+/* greedy label placement avoiding overlaps */
+function placeLabels(g, items, boxes, fs, clip, soft){
+  soft = soft || [];
+  const skipped=[], placed=[];
+  // halo pass then fill pass, so legibility does not depend on paint-order support
+  const halo=el("g",{}), face=el("g",{});
+  items.forEach(it=>{
+    const w = it.text.length*fs*0.54+4, h=fs+2;
+    const o = (it.r||3)+4, up = o+h-2, dn = o+h;
+    // offsets must clear the dot's own radius, or big dots never get a label
+    const cands=[[o,fs*0.36,"start"],[-o,fs*0.36,"end"],[0,-up,"middle"],[0,dn,"middle"],
+                 [o*0.8,-up*0.8,"start"],[-o*0.8,-up*0.8,"end"],
+                 [o*0.8,dn*0.9,"start"],[-o*0.8,dn*0.9,"end"],
+                 [0,-(up+h),"middle"],[0,dn+h,"middle"],
+                 [o+h,-up,"start"],[-(o+h),-up,"end"],[o+h,dn,"start"],[-(o+h),dn,"end"],
+                 [0,-(up+h*2),"middle"],[0,dn+h*2,"middle"]];
+    const over=(b,set)=>set.some(q=>!(b.x+b.w<q.x||q.x+q.w<b.x||b.y+b.h<q.y||q.y+q.h<b.y));
+    // pass 1 clears every dot and every label; pass 2 relaxes to the big dots and labels only,
+    // so a mega-cap in a crowded patch still gets named instead of silently vanishing
+    for(let pass=0;pass<2;pass++){
+      for(let k=0;k<cands.length;k++){
+        const [dx,dy,an]=cands[k];
+        const x0 = an==="start"? it.x+dx : an==="end"? it.x+dx-w : it.x+dx-w/2;
+        const b={x:x0,y:it.y+dy-h+2,w:w,h:h};
+        if(clip && (b.x<clip.x||b.y<clip.y||b.x+b.w>clip.x+clip.w||b.y+b.h>clip.y+clip.h)) continue;
+        if(over(b,boxes) || (pass===0 && over(b,soft))) continue;
+        boxes.push(b);
+        placed.push({x:it.x+dx,y:it.y+dy,an,t:it.text,
+          lead: Math.hypot(dx,dy) > (it.r||3)+h+5 ? [it.x,it.y,b.x+b.w/2,b.y+b.h/2] : null});
+        return;
+      }
+    }
+    skipped.push(it.text);
+  });
+  placed.forEach(p=>{ if(p.lead) halo.appendChild(el("line",
+    {x1:p.lead[0],y1:p.lead[1],x2:p.lead[2],y2:p.lead[3],stroke:"#8d8575","stroke-width":.7,opacity:.75})); });
+  placed.forEach(p=>halo.appendChild(el("text",{x:p.x,y:p.y,"text-anchor":p.an,"font-size":fs,
+    "font-weight":"700",fill:"none",stroke:"#fffdf9","stroke-width":"3.4","stroke-linejoin":"round"},p.t)));
+  placed.forEach(p=>face.appendChild(el("text",{x:p.x,y:p.y,"text-anchor":p.an,"font-size":fs,
+    "font-weight":"700",fill:"#15130f"},p.t)));
+  g.appendChild(halo); g.appendChild(face);
+  if(skipped.length) console.warn("labels dropped (no clear spot):", skipped.join(","));
+  return {placed:placed.length, skipped:skipped.length};
+}
+
+/* ---------- generic scatter ---------- */
+function scatter(opts){
+  const W=opts.W||1000, H=opts.H||620;
+  const M=opts.M||{t:34,r:26,b:62,l:78};
+  const iw=W-M.l-M.r, ih=H-M.t-M.b;
+  const svg=el("svg",{viewBox:`0 0 ${W} ${H}`,role:"img"});
+  const sx=v=>M.l+(opts.xscale(v))*iw, sy=v=>M.t+(1-opts.yscale(v))*ih;
+  const boxes=[];   // reserved rectangles that point labels must avoid
+
+  // quadrant blocks
+  if(opts.quad){
+    const qx=sx(opts.quad.x), qy=sy(opts.quad.y);
+    const q=[["#e9efdf",M.l,M.t,qx-M.l,qy-M.t],["#e2e9f4",qx,M.t,M.l+iw-qx,qy-M.t],
+             ["#ece8d8",M.l,qy,qx-M.l,M.t+ih-qy],["#f6e3dd",qx,qy,M.l+iw-qx,M.t+ih-qy]];
+    q.forEach(([c,x,y,w,h])=>{ if(w>0&&h>0) svg.appendChild(el("rect",{x,y,width:w,height:h,fill:c})); });
+    svg.appendChild(el("line",{x1:qx,y1:M.t,x2:qx,y2:M.t+ih,stroke:"#8d8575","stroke-width":1,"stroke-dasharray":"5 4"}));
+    svg.appendChild(el("line",{x1:M.l,y1:qy,x2:M.l+iw,y2:qy,stroke:"#8d8575","stroke-width":1,"stroke-dasharray":"5 4"}));
+    const QT=opts.quad.titles||["BEST VALUE","PREMIUM","BUDGET","POOR VALUE"];
+    const QL=[[QT[0],opts.quad.labels[0],M.l+12,M.t+22,"start","#3f5c27"],
+              [QT[1],opts.quad.labels[1],M.l+iw-12,M.t+22,"end","#2b4a75"],
+              [QT[2],opts.quad.labels[2],M.l+12,M.t+ih-14,"start","#6d6030"],
+              [QT[3],opts.quad.labels[3],M.l+iw-12,M.t+ih-14,"end","#8d3522"]];
+    if(opts.quad.show!==false) QL.forEach(([a,b,x,y,an,c],i)=>{
+      const up = i<2;
+      svg.appendChild(el("text",{x,y,"text-anchor":an,"font-size":15,"font-weight":"800",fill:c,"letter-spacing":".06em"},a));
+      svg.appendChild(el("text",{x,y:up?y+16:y-17,"text-anchor":an,"font-size":12.5,fill:c,opacity:.9},b));
+      const bw=Math.max(a.length*8.4, b.length*6.3)+4;
+      const bx = an==="end"? x-bw : x;
+      boxes.push({x:bx, y:(up?y-13:y-30), w:bw, h:33});   // keep dot labels off the corner captions
+    });
+  } else {
+    svg.appendChild(el("rect",{x:M.l,y:M.t,width:iw,height:ih,fill:"#fff",stroke:"#e3dccf"}));
+  }
+
+  // axes + ticks
+  (opts.xticks||[]).forEach(t=>{
+    const x=sx(t.v);
+    if(opts.xgrid) svg.appendChild(el("line",{x1:x,y1:M.t,x2:x,y2:M.t+ih,stroke:"#e0d9cb","stroke-width":.8}));
+    svg.appendChild(el("line",{x1:x,y1:M.t+ih,x2:x,y2:M.t+ih+5,stroke:"#9b9384"}));
+    svg.appendChild(el("text",{x,y:M.t+ih+20,"text-anchor":"middle","font-size":11.5,fill:"#554f46"},t.l));
+  });
+  (opts.yticks||[]).forEach(t=>{
+    const y=sy(t.v);
+    if(opts.ygrid) svg.appendChild(el("line",{x1:M.l,y1:y,x2:M.l+iw,y2:y,stroke:"#e0d9cb","stroke-width":.8}));
+    svg.appendChild(el("text",{x:M.l-9,y:y+4,"text-anchor":"end","font-size":11.5,fill:"#554f46"},t.l));
+  });
+  svg.appendChild(el("line",{x1:M.l,y1:M.t+ih,x2:M.l+iw,y2:M.t+ih,stroke:"#15130f","stroke-width":1.2}));
+  svg.appendChild(el("line",{x1:M.l,y1:M.t,x2:M.l,y2:M.t+ih,stroke:"#15130f","stroke-width":1.2}));
+  svg.appendChild(el("text",{x:M.l+iw/2,y:H-16,"text-anchor":"middle","font-size":13,"font-weight":"700"},opts.xlab));
+  svg.appendChild(el("text",{x:16,y:M.t+ih/2,"text-anchor":"middle","font-size":13,"font-weight":"700",
+    transform:`rotate(-90 16 ${M.t+ih/2})`},opts.ylab));
+
+  // points
+  const pg=el("g",{}); svg.appendChild(pg);
+  const pts=opts.points.slice().sort((a,b)=>b.r-a.r);
+  pts.forEach(p=>{
+    const c=el("circle",{cx:sx(p.x).toFixed(1),cy:sy(p.y).toFixed(1),r:p.r,fill:p.c,
+      stroke:"#fffdf9","stroke-width":.8,opacity:p.o==null?.92:p.o});
+    c.style.cursor="pointer"; attachHover(c,p.d); pg.appendChild(c);
+  });
+
+  // labels
+  const lg=el("g",{}); svg.appendChild(lg);
+  const soft=[];   // every dot: avoided if possible
+  pts.forEach(p=>{
+    const b={x:sx(p.x)-p.r,y:sy(p.y)-p.r,w:p.r*2,h:p.r*2};
+    (p.r>=4.5||p.lab ? boxes : soft).push(b);   // big or labelled dots are never covered
+  });
+  placeLabels(lg, pts.filter(p=>p.lab).map(p=>({x:sx(p.x),y:sy(p.y),r:p.r,text:p.lab})),
+    boxes, opts.fs||11.5, {x:M.l+1,y:M.t+1,w:iw-2,h:ih-2}, soft);
+
+  if(opts.after) opts.after(svg,{sx,sy,M,iw,ih});
+  return svg;
+}
+
+const logx = (lo,hi) => v => (Math.log10(Math.min(Math.max(v,lo),hi))-Math.log10(lo))/(Math.log10(hi)-Math.log10(lo));
+const linx = (lo,hi) => v => (Math.min(Math.max(v,lo),hi)-lo)/(hi-lo);
+const PETICKS=[3,5,8,12,18,25,35,50,80,130,220,450].map(v=>({v,l:v>=450?"450+":String(v)}));
+
+function radius(mc){ return Math.max(3.1, Math.min(15.5, Math.sqrt(mc)/5.2)); }
+
+function pt(d,xv,yv,color,lab){
+  return {x:xv,y:yv,r:radius(d.mc),c:color,d:d,lab:lab||null};
+}
+
+/* ---------- slides ---------- */
+const slides=[];
+
+/* 1 \u2014 cover */
+slides.push({label:"How to read it", build(){
+  const n=ST.length, mega=ST.slice().sort((a,b)=>b.mc-a.mc).slice(0,10).map(d=>d.t).join(", ");
+  return `<h1>What you pay vs. what you get</h1>
+  <p class="sub">Every company in the S&amp;P 500 and the Nasdaq-100, placed by what the market charges for a
+  dollar of its profit and by how profitable the underlying business actually is. Same idea as a cost-of-living
+  map: cheap isn't good if the thing you're buying is mediocre, and expensive can be fine if what you get is excellent.</p>
+  <div class="cards">
+    <div class="card"><h4>The horizontal axis \u2014 the price</h4>
+      <p class="tiny">Trailing price-to-earnings ratio. Left is cheap: you pay little for each dollar the company
+      earned over the last twelve months. Right is expensive. Plotted on a log scale because the range runs from
+      under 3\u00d7 to over 1,000\u00d7.</p></div>
+    <div class="card"><h4>The vertical axis \u2014 the quality</h4>
+      <p class="tiny">Net profit margin, expressed as a percentile against the other ${n} companies. High up means
+      a large share of every revenue dollar survives all the way to net income \u2014 pricing power, low capital
+      intensity, or both. Low down means a thin, grinding business.</p></div>
+    <div class="card"><h4>The four corners</h4>
+      <p class="tiny"><b style="color:var(--green)">Best value</b> \u2014 fat margins, modest price.
+      <b style="color:var(--steel)">Premium</b> \u2014 fat margins, you pay for them.
+      <b style="color:var(--olive)">Budget</b> \u2014 thin margins, priced accordingly.
+      <b style="color:var(--red)">Poor value</b> \u2014 thin margins and an expensive multiple anyway.</p></div>
+    <div class="card"><h4>Dot size and colour</h4>
+      <p class="tiny">Area is proportional to market capitalisation, so the ten giants (${mega}) dominate visually
+      the way they dominate the indexes. Colour marks index membership. Hover any dot for its full breakdown.</p></div>
+  </div>
+  <div class="note"><b>One thing to keep in mind throughout.</b> This is a two-variable map of a market, not a
+  recommendation engine. Price-to-earnings looks backwards at the last twelve months, so a company that just took a
+  large write-off looks absurdly expensive, and net margin flatters asset-light businesses while penalising
+  distributors and retailers that run on volume. The sector-relative slide and the method slide deal with both problems.</p>
+  <p class="foot">Market data from StockAnalysis.com, pulled ${DATA.asof}. Index membership from the Wikipedia
+  constituent lists for the S&amp;P 500 and Nasdaq-100. ${DATA.excluded.length} companies are off the map because they
+  have no positive trailing earnings \u2014 they're listed on the final slide.</p>`;
+}});
+
+/* 2 \u2014 full map */
+slides.push({label:"The whole market", build(){
+  const host=document.createElement("div");
+  const n=ST.length;
+  host.innerHTML=`<h2>All ${n} companies, priced against their own profitability</h2>
+  <p class="sub">Trailing P/E against net-margin percentile. Dashed lines mark the median company:
+  ${MED_PE.toFixed(1)}\u00d7 earnings, ${DATA.medianMargin.toFixed(1)}% net margin.</p>`;
+  const leg=document.createElement("div"); leg.className="legend";
+  const state={sp:true,ndx:true,both:true};
+  ["both","sp","ndx"].forEach(k=>{
+    const b=document.createElement("span"); b.className="key";
+    b.innerHTML=`<span class="sw" style="background:${IDXCOL[k]}"></span>${IDXLAB[k]} <span class="tiny">(${ST.filter(d=>d.i===k).length})</span>`;
+    b.onclick=()=>{ state[k]=!state[k]; b.classList.toggle("off",!state[k]); draw(); };
+    leg.appendChild(b);
+  });
+  const sz=document.createElement("span"); sz.className="tiny";
+  sz.style.marginLeft="auto"; sz.innerHTML="dot area &prop; market cap";
+  leg.appendChild(sz);
+  host.appendChild(leg);
+  const box=document.createElement("div"); box.className="chartbox"; host.appendChild(box);
+
+  const labelSet=new Set(ST.slice().sort((a,b)=>b.mc-a.mc).slice(0,20).map(d=>d.t));
+  ["CHTR","MU","ALL","AES","CRWD","PANW","TSLA","MRK","EL","PGR","FIX","VICI","SYF","UHS","TTD","PDD","EIX","FIS"]
+    .forEach(t=>labelSet.add(t));
+
+  function draw(){
+    box.innerHTML="";
+    const pts=ST.filter(d=>state[d.i]).map(d=>pt(d,d.pe,d.q,IDXCOL[d.i],labelSet.has(d.t)?d.t:null));
+    box.appendChild(scatter({
+      points:pts, xscale:logx(3,PE_CAP), yscale:linx(0,100),
+      xticks:PETICKS, yticks:[0,20,40,60,80,100].map(v=>({v,l:String(v)})),
+      xlab:"Trailing price / earnings  \u00b7  cheaper \u2190   \u2192 more expensive   (log scale)",
+      ylab:"Net profit margin, percentile  \u00b7  better \u2192",
+      quad:{x:MED_PE,y:50,labels:["fat margins, modest price","fat margins, priced for it",
+        "thin margins, priced for it","thin margins, expensive anyway"]},
+      H:640
+    }));
+  }
+  draw();
+  const f=document.createElement("p"); f.className="foot";
+  f.innerHTML=`Hover any dot for the full breakdown; click a legend entry to drop an index. On a narrow screen,
+  scroll the chart sideways. Five companies sit beyond the right edge and are pinned at 450&times;: ` +
+  ST.filter(d=>d.pe>PE_CAP).sort((a,b)=>b.pe-a.pe).map(d=>`${d.t} (${Math.round(d.pe).toLocaleString()}&times;)`).join(", ") +
+  `. Their trailing earnings are close to zero, which inflates the ratio rather than saying much about the business.`;
+  host.appendChild(f);
+  return host;
+}});
+
+/* 3 \u2014 mega caps */
+slides.push({label:"The 60 giants", build(){
+  const host=document.createElement("div");
+  const top=ST.slice().sort((a,b)=>b.mc-a.mc).slice(0,60);
+  const share=100*top.reduce((s,d)=>s+d.mc,0)/ST.reduce((s,d)=>s+d.mc,0);
+  host.innerHTML=`<h2>The sixty largest, labelled</h2>
+  <p class="sub">These ${top.length} companies are ${share.toFixed(0)}% of the combined market value on the previous slide.
+  Percentiles are still measured against the full universe, so the vertical position of each dot is unchanged \u2014
+  this is the same map with the crowd removed.</p>`;
+  const leg=document.createElement("div"); leg.className="legend";
+  leg.innerHTML=["both","sp","ndx"].map(k=>`<span class="key"><span class="sw" style="background:${IDXCOL[k]}"></span>${IDXLAB[k]}</span>`).join("");
+  host.appendChild(leg);
+  const box=document.createElement("div"); box.className="chartbox";
+  box.appendChild(scatter({
+    points:top.map(d=>pt(d,d.pe,d.q,IDXCOL[d.i],d.t)),
+    xscale:logx(5,PE_CAP), yscale:linx(0,100),
+    xticks:PETICKS.filter(t=>t.v>=5), yticks:[0,20,40,60,80,100].map(v=>({v,l:String(v)})),
+    xlab:"Trailing price / earnings  \u00b7  cheaper \u2190   \u2192 more expensive   (log scale)",
+    ylab:"Net profit margin, percentile  \u00b7  better \u2192",
+    quad:{x:MED_PE,y:50,labels:["fat margins, modest price","fat margins, priced for it",
+      "thin margins, priced for it","thin margins, expensive anyway"]},
+    H:660, fs:12
+  }));
+  host.appendChild(box);
+  const bv=top.filter(d=>d.pe<MED_PE&&d.q>50).sort((a,b)=>b.mc-a.mc).slice(0,6).map(d=>d.t);
+  const pv=top.filter(d=>d.pe>=MED_PE&&d.q<=50).sort((a,b)=>b.mc-a.mc).slice(0,6).map(d=>d.t);
+  const f=document.createElement("p"); f.className="foot";
+  f.innerHTML=`Among the giants, the cheap-and-profitable corner holds <b>${bv.join(", ")}</b>. The
+  expensive-and-thin corner holds <b>${pv.join(", ")}</b> \u2014 in several cases because a recent charge crushed
+  trailing earnings rather than because the business is weak.`;
+  host.appendChild(f);
+  return host;
+}});
+
+/* 4 \u2014 sector relative */
+slides.push({label:"Graded on a curve", build(){
+  const host=document.createElement("div");
+  host.innerHTML=`<h2>The same question, asked inside each sector</h2>
+  <p class="sub">A bank keeps a quarter of its revenue; a grocer keeps two cents. Comparing them on raw margin tells
+  you which industry they're in, not which company is good. Here both axes are percentiles <i>within the company's own
+  sector</i> \u2014 so a dot at the top left is cheap and highly profitable <b>for its industry</b>.</p>`;
+  const leg=document.createElement("div"); leg.className="legend";
+  const on={}; Object.keys(SECCOL).forEach(k=>on[k]=true);
+  Object.keys(SECCOL).forEach(k=>{
+    const b=document.createElement("span"); b.className="key";
+    b.innerHTML=`<span class="sw" style="background:${SECCOL[k]}"></span>${S[k]}`;
+    b.onclick=()=>{ on[k]=!on[k]; b.classList.toggle("off",!on[k]); draw(); };
+    leg.appendChild(b);
+  });
+  host.appendChild(leg);
+  const box=document.createElement("div"); box.className="chartbox"; host.appendChild(box);
+  const lab=new Set(ST.filter(d=>d.qs>=88&&d.pps<=18).concat(ST.filter(d=>d.mc>400)).map(d=>d.t));
+  function draw(){
+    box.innerHTML="";
+    box.appendChild(scatter({
+      points:ST.filter(d=>on[d.s]).map(d=>pt(d,d.pps,d.qs,SECCOL[d.s],lab.has(d.t)?d.t:null)),
+      xscale:linx(0,100), yscale:linx(0,100),
+      xticks:[0,25,50,75,100].map(v=>({v,l:v+"th"})), yticks:[0,25,50,75,100].map(v=>({v,l:v+"th"})),
+      xlab:"P/E percentile within its sector  \u00b7  cheapest \u2190   \u2192 dearest",
+      ylab:"Net margin percentile within its sector  \u00b7  better \u2192",
+      quad:{x:50,y:50,labels:["cheap for its sector, top margins in it",
+        "the sector's best margins, at its top prices",
+        "cheap, and deserves to be", "weaker margins, higher prices"]},
+      H:640, xgrid:true, ygrid:true
+    }));
+  }
+  draw();
+  const f=document.createElement("p"); f.className="foot";
+  f.innerHTML=`Click sectors to isolate them. Labelled dots are companies in the top decile of their sector's margins
+  while sitting in the cheapest fifth of its multiples, plus every company above $400B. Sectors with fewer than three
+  members would make percentiles meaningless; none here are that small.`;
+  host.appendChild(f);
+  return host;
+}});
+
+/* 5 \u2014 sector grid */
+slides.push({label:"Sector by sector", build(){
+  const host=document.createElement("div");
+  host.innerHTML=`<h2>Eleven sectors, same axes</h2>
+  <p class="sub">Raw values this time \u2014 trailing P/E across the bottom, net margin up the side \u2014 on an identical grid
+  for every panel, so the clouds can be compared directly. The crosshair is that sector's own median.</p>`;
+  const g=document.createElement("div"); g.className="gridwrap"; host.appendChild(g);
+  DATA.sectorStats.forEach(s=>{
+    const grp=ST.filter(d=>d.s===s.code);
+    const big=grp.slice().sort((a,b)=>b.mc-a.mc).slice(0,3).map(d=>d.t);
+    const box=document.createElement("div"); box.className="chartbox";
+    const head=document.createElement("div");
+    head.style.cssText="padding:9px 11px 0;font-weight:800;font-size:14px";
+    head.innerHTML=`${s.label} <span class="tiny" style="font-weight:500">\u00b7 ${s.n} cos \u00b7 $${s.mcap.toFixed(1)}T \u00b7
+      median ${s.med_pe}&times;, ${s.med_margin}%</span>`;
+    box.appendChild(head);
+    box.appendChild(scatter({
+      points:grp.map(d=>pt(d,d.pe,Math.min(d.mg,80),SECCOL[s.code],big.includes(d.t)?d.t:null)),
+      xscale:logx(4,PE_CAP), yscale:linx(0,80),
+      xticks:[5,12,25,50,130,450].map(v=>({v,l:v>=450?"450+":String(v)})),
+      yticks:[0,20,40,60,80].map(v=>({v,l:v+"%"})),
+      xlab:"P/E (log)", ylab:"net margin",
+      quad:{x:s.med_pe,y:s.med_margin,labels:["","","",""],show:false},
+      W:430,H:320,M:{t:14,r:14,b:48,l:48},fs:9.5
+    }));
+    g.appendChild(box);
+  });
+  const f=document.createElement("p"); f.className="foot";
+  f.innerHTML=`Information Technology is the most expensive sector in the market at a ${DATA.sectorStats.find(s=>s.code==="IT").med_pe}&times;
+  median, and also the most profitable at ${DATA.sectorStats.find(s=>s.code==="IT").med_margin}% \u2014 the two facts are
+  not independent. Financials sit at ${DATA.sectorStats.find(s=>s.code==="FIN").med_pe}&times; on
+  ${DATA.sectorStats.find(s=>s.code==="FIN").med_margin}% margins, which is the single clearest reason the raw-margin
+  axis on slide 2 needs the sector adjustment on slide 4. Margins are clipped at 80% for the panel grid.`;
+  host.appendChild(f);
+  return host;
+}});
+
+/* 6 \u2014 has the market already paid */
+slides.push({label:"Price vs. past returns", build(){
+  const host=document.createElement("div");
+  const g=ST.filter(d=>d.r5!=null);
+  host.innerHTML=`<h2>Has the market already paid for the quality?</h2>
+  <p class="sub">The same price axis, but vertically this is the annualised total return over the past five years for
+  the ${g.length} companies with a five-year record. A high multiple earned after a decade of compounding is a
+  different proposition from a high multiple with nothing behind it.</p>`;
+  const leg=document.createElement("div"); leg.className="legend";
+  leg.innerHTML=Object.keys(SECCOL).map(k=>`<span class="key"><span class="sw" style="background:${SECCOL[k]}"></span>${S[k]}</span>`).join("");
+  host.appendChild(leg);
+  const med5=g.map(d=>d.r5).sort((a,b)=>a-b)[Math.floor(g.length/2)];
+  const lab=new Set(g.filter(d=>d.r5>40||d.r5<-20||d.mc>500).map(d=>d.t));
+  const box=document.createElement("div"); box.className="chartbox";
+  box.appendChild(scatter({
+    points:g.map(d=>pt(d,d.pe,Math.max(-32,Math.min(d.r5,90)),SECCOL[d.s],lab.has(d.t)?d.t:null)),
+    xscale:logx(3,PE_CAP), yscale:linx(-32,90),
+    xticks:PETICKS, yticks:[-30,-15,0,15,30,45,60,75,90].map(v=>({v,l:(v>0?"+":"")+v+"%"})),
+    xlab:"Trailing price / earnings  \u00b7  cheaper \u2190   \u2192 more expensive   (log scale)",
+    ylab:"Annualised total return, past 5 years",
+    quad:{x:MED_PE,y:med5,labels:["cheap, and it already compounded",
+      "expensive, and it earned the re-rating","cheap, and it went nowhere",
+      "expensive, with nothing behind it"]},
+    H:640, ygrid:true
+  }));
+  host.appendChild(box);
+  const f=document.createElement("p"); f.className="foot";
+  f.innerHTML=`Median five-year return in this group is ${med5.toFixed(1)}% a year; the dashed horizontal line sits there.
+  Returns are annualised and include dividends. Companies that listed or spun off within the last five years have no
+  bar to clear and are simply absent. Values are clipped to the &minus;32% to +90% window.`;
+  host.appendChild(f);
+  return host;
+}});
+
+/* 7 \u2014 leaderboards */
+slides.push({label:"The four corners", build(){
+  const host=document.createElement("div");
+  host.innerHTML=`<h2>Who actually sits in each corner</h2>
+  <p class="sub">Ranked by market capitalisation inside each quadrant, so these are the companies whose position
+  carries the most weight \u2014 not the most extreme dots.</p>`;
+  const quads=[
+    ["bv","Best value","Cheaper than the median ${pe}\u00d7 and above median margin",d=>d.pe<MED_PE&&d.q>50],
+    ["pr","Premium","Above median margin, and you pay above the median ${pe}\u00d7 for it",d=>d.pe>=MED_PE&&d.q>50],
+    ["bd","Budget","Below median margin, but priced below the median ${pe}\u00d7",d=>d.pe<MED_PE&&d.q<=50],
+    ["bad","Poor value","Below median margin and an above-median multiple anyway",d=>d.pe>=MED_PE&&d.q<=50]
+  ];
+  const cards=document.createElement("div"); cards.className="cards-wide"; host.appendChild(cards);
+  quads.forEach(([cls,title,desc,fn])=>{
+    const g=ST.filter(fn).sort((a,b)=>b.mc-a.mc);
+    const c=document.createElement("div"); c.className="card "+cls;
+    c.innerHTML=`<h4>${title} <span class="tiny" style="font-weight:500">\u00b7 ${g.length} companies</span></h4>
+      <p class="cd">${desc.replace("${pe}",MED_PE.toFixed(1))}</p>
+      <table class="lb"><colgroup><col style="width:46%"><col style="width:14%"><col style="width:10%"><col style="width:15%"><col style="width:15%"></colgroup>
+      <thead><tr><th class="l">Company</th><th>Cap</th><th>P/E</th><th>Margin</th><th>5y</th></tr></thead>
+      <tbody>${g.slice(0,14).map(d=>`<tr><td class="l nm" title="${esc(d.n)}"><span class="tk">${d.t}</span> <span class="tiny">${esc(d.n)}</span></td>
+        <td>${fmtB(d.mc)}</td><td>${d.pe>450?Math.round(d.pe).toLocaleString():d.pe.toFixed(1)}</td>
+        <td>${d.mg.toFixed(1)}%</td><td>${d.r5==null?"\u2014":pc(d.r5)}</td></tr>`).join("")}</tbody></table>`;
+    cards.appendChild(c);
+  });
+  const ext=document.createElement("div");
+  const cheap=ST.slice().sort((a,b)=>a.pe-b.pe).slice(0,8);
+  const fat=ST.slice().sort((a,b)=>b.mg-a.mg).slice(0,8);
+  ext.innerHTML=`<h3>Extremes</h3>
+  <div class="cards">
+   <div class="card"><h4>Lowest trailing multiples</h4><p class="cd">Cheapest earnings in either index</p>
+     <table class="lb"><colgroup><col style="width:40%"><col style="width:15%"><col style="width:16%"><col style="width:29%"></colgroup>
+     <thead><tr><th class="l">Company</th><th>P/E</th><th>Margin</th><th class="l">Sector</th></tr></thead>
+     <tbody>${cheap.map(d=>`<tr><td class="l nm" title="${esc(d.n)}"><span class="tk">${d.t}</span> <span class="tiny">${esc(d.n)}</span></td>
+      <td>${d.pe.toFixed(1)}&times;</td><td>${d.mg.toFixed(1)}%</td><td class="l sc tiny" title="${S[d.s]}">${S[d.s]}</td></tr>`).join("")}</tbody></table></div>
+   <div class="card"><h4>Fattest net margins</h4><p class="cd">Most of each revenue dollar kept</p>
+     <table class="lb"><colgroup><col style="width:40%"><col style="width:16%"><col style="width:15%"><col style="width:29%"></colgroup>
+     <thead><tr><th class="l">Company</th><th>Margin</th><th>P/E</th><th class="l">Sector</th></tr></thead>
+     <tbody>${fat.map(d=>`<tr><td class="l nm" title="${esc(d.n)}"><span class="tk">${d.t}</span> <span class="tiny">${esc(d.n)}</span></td>
+      <td>${d.mg.toFixed(1)}%</td><td>${d.pe.toFixed(1)}&times;</td><td class="l sc tiny" title="${S[d.s]}">${S[d.s]}</td></tr>`).join("")}</tbody></table></div>
+  </div>`;
+  host.appendChild(ext);
+  return host;
+}});
+
+/* 8 \u2014 method */
+slides.push({label:"Method & caveats", build(){
+  const ex=DATA.excluded;
+  return `<h2>How this was built, and where it breaks</h2>
+  <div class="cards">
+    <div class="card"><h4>The universe</h4>
+      <p class="tiny">All 502 S&amp;P 500 tickers plus the 15 Nasdaq-100 members that aren't in the S&amp;P 500 \u2014
+      517 listings, 516 with any data. Dual share classes (Alphabet, Fox, News Corp) appear twice because they trade
+      at different prices. Membership comes from the Wikipedia constituent lists; sector labels are GICS.</p></div>
+    <div class="card"><h4>The price axis</h4>
+      <p class="tiny">Trailing twelve-month price-to-earnings as reported by StockAnalysis.com on ${DATA.asof}.
+      Trailing, not forward: no analyst estimates are involved, which keeps the whole chart from one source but means
+      one bad quarter can dominate a company's position.</p></div>
+    <div class="card"><h4>The quality axis</h4>
+      <p class="tiny">Net income is derived as market capitalisation &divide; P/E, which recovers trailing net income
+      exactly. Net margin is that figure over trailing revenue. The axis then shows each company's percentile against
+      the other ${ST.length}, so it reads like the livability chart it's modelled on.</p></div>
+    <div class="card"><h4>What quality does <i>not</i> include</h4>
+      <p class="tiny">No return on capital, no revenue growth, no leverage, no gross margin. Those were the other
+      ingredients worth having, and no free bulk source for all ~500 names was reachable. Net margin alone is a real
+      but narrow measure of business quality \u2014 read the vertical axis as profitability, not as a verdict.</p></div>
+  </div>
+  <h3>Four ways this chart will mislead you</h3>
+  <ul class="tiny">
+    <li><b>A write-off looks like an expensive stock.</b> Merck at ${ST.find(d=>d.t==="MRK").pe.toFixed(0)}&times; and
+      Genuine Parts at ${ST.find(d=>d.t==="GPC").pe.toFixed(0)}&times; are not richly valued businesses; they are
+      businesses whose last twelve months of earnings were wrecked by a charge. Trailing P/E cannot tell the difference.</li>
+    <li><b>Near-zero GAAP profit explodes the ratio.</b> Four of the five names pinned at the right edge are
+      software and AI infrastructure \u2014 ${["CRWD","PANW","NBIS","DDOG"].map(t=>t+" at "+Math.round(ST.find(d=>d.t===t).pe).toLocaleString()+"\u00d7").join(", ")} \u2014
+      which earn almost nothing on a GAAP basis once stock compensation is deducted while generating real cash.
+      On a cash-flow multiple they would move a long way left.</li>
+    <li><b>Net margin rewards asset-light models.</b> Banks, exchanges, REITs and royalty companies book huge margins
+      by construction; distributors like McKesson and Cencora book 1&ndash;2% on enormous revenue and are excellent
+      businesses. Slide 4 exists because of this.</li>
+    <li><b>Twenty-nine companies are missing entirely</b> \u2014 no positive trailing earnings, so neither axis can be
+      computed. Several are among the largest listings in the market, which is its own kind of distortion.</li>
+  </ul>
+  <h3>The ${ex.length} companies off the map</h3>
+  <table><thead><tr><th class="l">Company</th><th>Market cap</th><th class="l">Sector</th><th class="l">Why</th></tr></thead>
+    <tbody>${ex.map(e=>`<tr><td class="l"><span class="tk">${e.ticker}</span> <span class="tiny">${esc(e.name)}</span></td>
+      <td>${fmtB(e.mcap)}</td><td class="l tiny">${S[e.sec]}</td><td class="l tiny">${e.reason}</td></tr>`).join("")}</tbody></table>
+  <p class="foot"><span class="src">Sources.</span> Prices, market caps, trailing P/E, revenue and annualised total
+  returns: StockAnalysis.com comparison tool and index lists, retrieved ${DATA.asof}. Constituents and GICS sectors:
+  Wikipedia lists of S&amp;P 500 and Nasdaq-100 companies. Everything else on these slides is arithmetic on those two
+  inputs. Nothing here is investment advice \u2014 I'm not a financial adviser, and a two-variable scatter plot is not a
+  basis for buying anything.</p>`;
+}});
+
+/* ================= FORWARD SLIDES (2030 / 2035) ================= */
+const fB = v => v==null? "\u2014" : (Math.abs(v)>=1000? "$"+(v/1000).toFixed(2)+"T" : "$"+v.toFixed(v<10?2:0)+"B");
+const sgn = v => v==null? "\u2014" : (v>0?"+":"")+v.toFixed(1)+"%";
+const IRCOL = v => v==null? "#9b9384" : v<0? "#b2452c" : v<5? "#c08a3e" : v<10? "#8a9a4c" : "#3f7d33";
+function ftip(r,extra){
+  const b=r.base&&r.base["2035"], c=r.base&&r.base["2030"];
+  const rows=[["Sector",S[r.s]],["Market cap",fB(r.mc)],
+    ["Revenue now",fB(r.rev)],["Net margin used",r.mg_used==null?"\u2014":r.mg_used.toFixed(1)+"%"],
+    ["Consensus growth, next yr",r.base?sgn(r.base.g0):"\u2014"],
+    ["Revenue 2030 (base)",c?fB(c.rev):"\u2014"],["Revenue 2035 (base)",b?fB(b.rev):"\u2014"],
+    ["Revenue CAGR to 2035",b?sgn(b.cagr):"\u2014"],
+    ["Implied return to 2035",b?sgn(b.ir):"\u2014"],
+    ["Bear / bull",r.bear?sgn(r.bear["2035"].ir)+" / "+sgn(r.bull["2035"].ir):"\u2014"],
+    ["Growth price demands",r.req_cagr==null?"\u2014":sgn(r.req_cagr)],
+    ["Gap (plausible \u2212 required)",r.gap==null?"\u2014":(r.gap>0?"+":"")+r.gap.toFixed(1)+"pp"],
+    ["Exit multiple assumed",r.base?r.base.xpe.toFixed(1)+"x":"\u2014"],
+    ["Analyst target / rating",(r.pt==null?"\u2014":"$"+r.pt.toFixed(0))+(r.rating?" \u00b7 "+r.rating:"")]];
+  let s="<b>"+esc(r.t)+"</b> &nbsp;"+esc(r.n)+"<div style='height:6px'></div>"+
+    rows.map(x=>"<div class='row'><span>"+x[0]+"</span><span>"+x[1]+"</span></div>").join("");
+  if(r.assumed_mg) s+="<div style='margin-top:6px;color:#b2452c;font-size:11.5px'>Loss-making today \u2014 margin assumed at the sector median.</div>";
+  if(r.cyc&&r.cyc.length) s+="<div style='margin-top:6px;color:#8d6a22;font-size:11.5px'>Assumption-sensitive: "+r.cyc.join("; ")+".</div>";
+  if(extra) s+="<div style='margin-top:6px;color:#6b6459;font-size:11.5px'>"+extra+"</div>";
+  return s;
+}
+function fhover(node,r){
+  node.addEventListener("mouseenter",e=>{ tip.innerHTML=ftip(r); tip.style.display="block"; moveTip(e);
+    node.setAttribute("stroke","#15130f"); node.setAttribute("stroke-width","1.6"); });
+  node.addEventListener("mousemove",moveTip);
+  node.addEventListener("mouseleave",()=>{ hideTip(); node.setAttribute("stroke","#fffdf9"); node.setAttribute("stroke-width","0.8"); });
+}
+function fpt(r,xv,yv,color,lab){ return {x:xv,y:yv,r:radius(r.mc),c:color,d:r,lab:lab||null,fwd:true}; }
+
+/* 9 - what is data, what is assumption */
+slides.push({label:"Forecasting to 2035", build(){
+  const sc=FWD.scen, n=FR.length;
+  return `<h1>From here, nobody has the data</h1>
+  <p class="sub">Everything on the previous eight slides was measured. Everything on the next five is partly modelled,
+  and the honest thing is to say exactly where the line falls.</p>
+  <div class="cards">
+    <div class="card"><h4>What is actually data</h4>
+      <p class="tiny">Five to six years of reported revenue, net income and gross margin for each company, plus
+      S&amp;P Global consensus revenue and EPS for the current and next fiscal year, and the 12-month analyst price
+      target. Pulled per company from ${n} forecast pages.</p></div>
+    <div class="card"><h4>Where the data stops</h4>
+      <p class="tiny">At the next fiscal year. S&amp;P Global consensus reaches FY2029 at the outside and only the
+      first two years are outside the paywall. <b>There is no consensus revenue estimate for 2035 anywhere</b>, for
+      any of these companies. Every 2035 figure here is the output of the assumption below.</p></div>
+    <div class="card"><h4>The growth assumption</h4>
+      <p class="tiny">Start from each company's own consensus growth into next year, then decay it geometrically
+      toward a terminal nominal rate. Base case fades to ${(sc.base.gT*100).toFixed(1)}% a year with a
+      ${sc.base.lam} annual persistence and caps the starting rate at ${(sc.base.cap*100).toFixed(0)}%.
+      Bear fades to ${(sc.bear.gT*100).toFixed(1)}%, bull to ${(sc.bull.gT*100).toFixed(1)}%.</p></div>
+    <div class="card"><h4>The margin assumption</h4>
+      <p class="tiny">Held <b>flat</b> at today's level in the base case; bear shaves ${((1-sc.bear.mfac)*100).toFixed(0)}% off it,
+      bull adds ${((sc.bull.mfac-1)*100).toFixed(0)}%. Flat is deliberate: mean-reverting a distributor's 1% margin
+      toward a sector median quintuples its earnings and tells you nothing real.</p></div>
+  </div>
+  <div class="note"><b>Why the cap matters more than anything else here.</b> Nvidia grew revenue at roughly 73% a year
+  over FY2022&ndash;26. Extrapolate that to 2035 and you get about $30 trillion of revenue &mdash; larger than US GDP.
+  Any forecast over this horizon is mostly a statement about how fast you think growth decays, not about the company.
+  That is why three scenarios appear on every forward slide, and why the bear-to-bull spread is usually wider than the
+  gap between any two companies.</div>
+  <h3>And the exit multiple, which is the other half of the answer</h3>
+  <p class="tiny">A 2035 earnings figure is only worth something once you decide what the market will pay for it. Each
+  company's exit multiple is 35% its own trailing multiple (capped at 60&times;) and 65% the market median of
+  ${FWD.mktPE.toFixed(1)}&times;, clamped to 10&ndash;32&times;, then scaled ${(sc.bear.xf*100).toFixed(0)}% in the bear case and
+  ${(sc.bull.xf*100).toFixed(0)}% in the bull. That is mean reversion by assumption. A company that holds a 40&times; multiple
+  to 2035 would beat these numbers substantially; one that re-rates to 12&times; would miss them.</p>
+  <p class="foot"><b>Not included, all of which matter:</b> dividends and buybacks (so every implied return here
+  understates total return, materially for Apple, the banks and the tobacco names); share-count change; net debt and
+  balance-sheet risk; and any discount for country, currency or governance risk &mdash; which is why a Chinese ADR can
+  top the cheap list on arithmetic alone. ${FWD.rows.length-n} companies could not be modelled at all:
+  ${FWD.rows.filter(r=>!r.modelled).map(r=>r.t).join(", ")}.</p>`;
+}});
+
+/* 10 - forward revenue map */
+slides.push({label:"Revenue, now vs 2035", build(){
+  const host=document.createElement("div");
+  const tot=FR.reduce((s,r)=>s+r.rev,0)/1000, t35=FR.reduce((s,r)=>s+r.base["2035"].rev,0)/1000;
+  host.innerHTML=`<h2>Where the revenue goes</h2>
+  <p class="sub">Revenue today against modelled revenue in 2035, both on log scales. The diagonal is no growth;
+  distance above it is the compounding the base case assumes. Colour is the implied annual return from today's price.
+  In aggregate these ${FR.length} companies go from $${tot.toFixed(1)}T of revenue to $${t35.toFixed(1)}T &mdash;
+  ${(100*(Math.pow(t35/tot,1/9)-1)).toFixed(1)}% a year, faster than nominal GDP, so the base case already assumes
+  they keep taking share of the world economy.</p>`;
+  const leg=document.createElement("div"); leg.className="legend";
+  leg.innerHTML=`<span class="tiny">implied annual return to 2035:</span>`+
+    [["below 0%","#b2452c"],["0-5%","#c08a3e"],["5-10%","#8a9a4c"],["above 10%","#3f7d33"]]
+    .map(([l,c])=>`<span class="key"><span class="sw" style="background:${c}"></span>${l}</span>`).join("")+
+    `<span class="tiny" style="margin-left:auto">dot area &prop; market cap today</span>`;
+  host.appendChild(leg);
+  const box=document.createElement("div"); box.className="chartbox"; host.appendChild(box);
+  const lab=new Set(FR.slice().sort((a,b)=>b.mc-a.mc).slice(0,22).map(r=>r.t));
+  ["PDD","MU","SNDK","TSLA","SPCX","CRWD","ORCL","PLTR","NBIS","CRWV","UNH","MCK"].forEach(t=>lab.add(t));
+  const pts=FR.map(r=>fpt(r, r.rev, r.base["2035"].rev, IRCOL(r.base["2035"].ir), lab.has(r.t)?r.t:null));
+  box.appendChild(scatter({
+    points:pts, xscale:logx(0.4,900), yscale:logx(0.4,2400),
+    xticks:[0.5,1,3,10,30,100,300,900].map(v=>({v,l:v<1?"$0.5B":(v>=1000?"$"+v/1000+"T":"$"+v+"B")})),
+    yticks:[0.5,1,3,10,30,100,300,1000,2400].map(v=>({v,l:v<1?"$0.5B":(v>=1000?"$"+(v/1000).toFixed(1)+"T":"$"+v+"B")})),
+    xlab:"Revenue today, trailing twelve months (log)",
+    ylab:"Modelled revenue 2035, base case (log)",
+    H:660, xgrid:true, ygrid:true,
+    after:(svg,g)=>{
+      svg.appendChild(el("line",{x1:g.sx(0.5),y1:g.sy(0.5),x2:g.sx(900),y2:g.sy(900),
+        stroke:"#8d8575","stroke-width":1,"stroke-dasharray":"5 4",opacity:.85}));
+      svg.appendChild(el("text",{x:g.sx(260),y:g.sy(300)-8,"font-size":11.5,fill:"#6b6459",
+        "text-anchor":"end"},"no growth to 2035"));
+    }
+  }));
+  const f=document.createElement("p"); f.className="foot";
+  f.innerHTML=`Hover for the full projection and the scenario range. Every dot above the dashed line is a company the
+  base case has growing; nothing here shrinks much, because consensus almost never forecasts decline and the fade
+  floors out at the terminal rate. That is a real limitation: this model cannot produce a Kodak.`;
+  host.appendChild(f);
+  return host;
+}});
+
+/* 11 - the headline: implied return vs today's multiple */
+slides.push({label:"Cheap vs. the future", build(){
+  const host=document.createElement("div");
+  const g=FR.filter(r=>r.pe&&r.pe>0&&r.pe<=200);
+  const med=FR.map(r=>r.base["2035"].ir).sort((a,b)=>a-b)[Math.floor(FR.length/2)];
+  host.innerHTML=`<h2>Is today's price cheap against 2035?</h2>
+  <p class="sub">Today's trailing multiple across the bottom; the annual return implied by the base-case 2035 earnings
+  and an assumed exit multiple up the side. Above the dashed line a company clears the ${(FWD.reqR*100).toFixed(0)}%
+  hurdle these projections are tested against; the median company in the universe lands at ${med.toFixed(1)}%.
+  ${g.length} of ${FR.length} companies appear &mdash; the rest have no positive trailing multiple to place them on.</p>`;
+  const leg=document.createElement("div"); leg.className="legend";
+  const on={}; Object.keys(SECCOL).forEach(k=>on[k]=true);
+  Object.keys(SECCOL).forEach(k=>{
+    const b=document.createElement("span"); b.className="key";
+    b.innerHTML=`<span class="sw" style="background:${SECCOL[k]}"></span>${S[k]}`;
+    b.onclick=()=>{ on[k]=!on[k]; b.classList.toggle("off",!on[k]); draw(); };
+    leg.appendChild(b);
+  });
+  host.appendChild(leg);
+  const box=document.createElement("div"); box.className="chartbox"; host.appendChild(box);
+  const lab=new Set(g.slice().sort((a,b)=>b.mc-a.mc).slice(0,20).map(r=>r.t));
+  g.filter(r=>r.mc>60&&(r.base["2035"].ir>15||r.base["2035"].ir<-5)).forEach(r=>lab.add(r.t));
+  function draw(){
+    box.innerHTML="";
+    box.appendChild(scatter({
+      points:g.filter(r=>on[r.s]).map(r=>fpt(r,r.pe,Math.max(-22,Math.min(r.base["2035"].ir,34)),
+        SECCOL[r.s], lab.has(r.t)?r.t:null)),
+      xscale:logx(2,200), yscale:linx(-22,34),
+      xticks:[3,5,8,12,20,30,50,90,200].map(v=>({v,l:String(v)})),
+      yticks:[-20,-10,0,8,15,20,25,30].map(v=>({v,l:(v>0?"+":"")+v+"%"})),
+      xlab:"Trailing price / earnings today  \u00b7  cheaper \u2190   \u2192 dearer   (log)",
+      ylab:"Implied annual return to 2035, base case",
+      quad:{x:FWD.mktPE,y:FWD.reqR*100,
+        titles:["CHEAP AND EARNS IT","DEAR BUT EARNS IT","CHEAP FOR A REASON","DEAR AND DOOMED"],
+        labels:[
+        "low multiple now, clears the hurdle to 2035",
+        "high multiple now, the growth still justifies it",
+        "low multiple now, and 2035 does not fix it",
+        "high multiple now, and 2035 does not rescue it"]},
+      H:660, ygrid:true
+    }));
+  }
+  draw();
+  const f=document.createElement("p"); f.className="foot";
+  f.innerHTML=`The dashed horizontal sits at the ${(FWD.reqR*100).toFixed(0)}% hurdle, the vertical at today's median
+  multiple of ${FWD.mktPE.toFixed(1)}&times;. Note how weakly the two axes relate: a low multiple today is <i>not</i> the
+  same claim as a good return to 2035, because the multiple says nothing about how fast earnings grow into it. Returns
+  are clipped to the &minus;22% to +34% window.`;
+  host.appendChild(f);
+  return host;
+}});
+
+/* 12 - the inversion */
+slides.push({label:"Required vs. plausible", build(){
+  const host=document.createElement("div");
+  const g=FR.filter(r=>r.req_cagr!=null&&r.gap!=null);
+  const pos=g.filter(r=>r.gap>0).length;
+  host.innerHTML=`<h2>What the price demands, against what the model delivers</h2>
+  <p class="sub">This slide needs no forecast to be useful. Across the bottom: the revenue growth today's market cap
+  <i>already requires</i> in order to return ${(FWD.reqR*100).toFixed(0)}% a year to 2035, holding margin and exit
+  multiple fixed. Up the side: the growth the base case actually produces. Below the diagonal the price is asking for
+  more than the model gives; above it, less. ${pos} of ${g.length} companies sit above the line.</p>`;
+  const leg=document.createElement("div"); leg.className="legend";
+  leg.innerHTML=Object.keys(SECCOL).map(k=>`<span class="key"><span class="sw" style="background:${SECCOL[k]}"></span>${S[k]}</span>`).join("");
+  host.appendChild(leg);
+  const box=document.createElement("div"); box.className="chartbox"; host.appendChild(box);
+  const lab=new Set(g.slice().sort((a,b)=>b.mc-a.mc).slice(0,18).map(r=>r.t));
+  g.filter(r=>r.mc>80&&Math.abs(r.gap)>9).forEach(r=>lab.add(r.t));
+  const cl=v=>Math.max(-12,Math.min(v,45));
+  box.appendChild(scatter({
+    points:g.map(r=>fpt(r,cl(r.req_cagr),cl(r.base["2035"].cagr),SECCOL[r.s],lab.has(r.t)?r.t:null)),
+    xscale:linx(-12,45), yscale:linx(-12,45),
+    xticks:[-10,0,10,20,30,45].map(v=>({v,l:(v>0?"+":"")+v+"%"})),
+    yticks:[-10,0,10,20,30,45].map(v=>({v,l:(v>0?"+":"")+v+"%"})),
+    xlab:"Revenue CAGR the current price requires, to 2035",
+    ylab:"Revenue CAGR the base case produces",
+    H:650, xgrid:true, ygrid:true,
+    after:(svg,gg)=>{
+      svg.appendChild(el("line",{x1:gg.sx(-12),y1:gg.sy(-12),x2:gg.sx(45),y2:gg.sy(45),
+        stroke:"#15130f","stroke-width":1.3,"stroke-dasharray":"6 4",opacity:.7}));
+      svg.appendChild(el("text",{x:gg.sx(33),y:gg.sy(37),"font-size":12,"font-weight":"700",
+        fill:"#3f5c27"},"model beats the hurdle"));
+      svg.appendChild(el("text",{x:gg.sx(26),y:gg.sy(6),"font-size":12,"font-weight":"700",
+        fill:"#8d3522"},"price demands more than the model gives"));
+    }
+  }));
+  const f=document.createElement("p"); f.className="foot";
+  f.innerHTML=`A negative required rate means the price is already so low that revenue could <i>shrink</i> and still
+  clear ${(FWD.reqR*100).toFixed(0)}% a year &mdash; common among refiners and insurers here. Values clipped to
+  &minus;12%&ndash;+45%. This is the chart to trust most on these five slides, because the horizontal axis is derived
+  from today's price rather than from any view about the future.`;
+  host.appendChild(f);
+  return host;
+}});
+
+/* 13 - scenario bands */
+slides.push({label:"Scenario spread", build(){
+  const host=document.createElement("div");
+  const g=FR.slice().sort((a,b)=>b.mc-a.mc).slice(0,34);
+  host.innerHTML=`<h2>How much of the answer is the assumption</h2>
+  <p class="sub">The 34 largest companies, each shown as the full bear-to-bull range of implied annual return to 2035.
+  The dot is the base case. Where a bar straddles zero, the sign of the answer is decided by the growth-fade
+  assumption rather than by anything about the business.</p>`;
+  const W=1000,H=g.length*25+86,M={t:34,r:120,b:52,l:132};
+  const iw=W-M.l-M.r, ih=H-M.t-M.b;
+  const lo=-30, hi=45;
+  const sx=v=>M.l+(Math.max(lo,Math.min(hi,v))-lo)/(hi-lo)*iw;
+  const svg=el("svg",{viewBox:`0 0 ${W} ${H}`});
+  svg.appendChild(el("rect",{x:M.l,y:M.t,width:iw,height:ih,fill:"#fffdf9"}));
+  [-30,-20,-10,0,10,20,30,45].forEach(v=>{
+    svg.appendChild(el("line",{x1:sx(v),y1:M.t,x2:sx(v),y2:M.t+ih,
+      stroke:v===0?"#15130f":"#e0d9cb","stroke-width":v===0?1.3:.8}));
+    svg.appendChild(el("text",{x:sx(v),y:M.t+ih+19,"text-anchor":"middle","font-size":11.5,
+      fill:"#554f46"},(v>0?"+":"")+v+"%"));
+  });
+  svg.appendChild(el("text",{x:M.l+iw/2,y:H-14,"text-anchor":"middle","font-size":13,
+    "font-weight":"700"},"Implied annual return to 2035  \u00b7  bear \u2014 base \u2014 bull"));
+  g.forEach((r,i)=>{
+    const y=M.t+14+i*25;
+    const be=r.bear["2035"].ir, ba=r.base["2035"].ir, bu=r.bull["2035"].ir;
+    svg.appendChild(el("text",{x:M.l-10,y:y+4,"text-anchor":"end","font-size":12,
+      "font-weight":"700"},r.t));
+    const bar=el("line",{x1:sx(be),y1:y,x2:sx(bu),y2:y,stroke:"#c7bfae","stroke-width":7,
+      "stroke-linecap":"round"});
+    svg.appendChild(bar);
+    [[be,"#b2452c"],[bu,"#3f7d33"]].forEach(([v,c])=>
+      svg.appendChild(el("circle",{cx:sx(v),cy:y,r:3.4,fill:c})));
+    const d=el("circle",{cx:sx(ba),cy:y,r:6,fill:IRCOL(ba),stroke:"#fffdf9","stroke-width":1.2});
+    d.style.cursor="pointer"; fhover(d,r); svg.appendChild(d);
+    svg.appendChild(el("text",{x:M.l+iw+10,y:y+4,"font-size":11.5,fill:"#554f46"},
+      sgn(be)+"  \u2192  "+sgn(bu)));
+  });
+  const box=document.createElement("div"); box.className="chartbox"; box.appendChild(svg);
+  host.appendChild(box);
+  const wide=g.map(r=>({t:r.t,w:r.bull["2035"].ir-r.bear["2035"].ir})).sort((a,b)=>b.w-a.w);
+  const f=document.createElement("p"); f.className="foot";
+  f.innerHTML=`Widest spreads: ${wide.slice(0,4).map(x=>x.t+" ("+x.w.toFixed(0)+"pp)").join(", ")} &mdash; all
+  high-growth names where the fade assumption compounds hardest. Narrowest:
+  ${wide.slice(-3).map(x=>x.t+" ("+x.w.toFixed(0)+"pp)").join(", ")}. Hover any base-case dot for the detail.`;
+  host.appendChild(f);
+  return host;
+}});
+
+/* 14 - forward leaderboards */
+slides.push({label:"The 2035 verdict", build(){
+  const host=document.createElement("div");
+  const big=FR.filter(r=>r.mc>=50);
+  const clean=big.filter(r=>!r.assumed_mg&&!(r.cyc&&r.cyc.length));
+  host.innerHTML=`<h2>Cheapest and dearest against 2035</h2>
+  <p class="sub">Companies above $50B, ranked by base-case implied annual return. The first table excludes anything
+  where the model is leaning on an assumption &mdash; a margin invented because the company loses money today, or a
+  margin and growth rate that look like the top of a cycle. The second table is those excluded names, because they are
+  the ones that look most attractive and deserve the most suspicion.</p>`;
+  const tbl=(rows,n)=>`<table class="lb"><colgroup><col style="width:24%"><col style="width:9%"><col style="width:7%">
+    <col style="width:9%"><col style="width:11%"><col style="width:9%"><col style="width:9%">
+    <col style="width:11%"><col style="width:11%"></colgroup>
+    <thead><tr><th class="l">Company</th><th>Cap</th><th>P/E</th><th>Margin</th>
+    <th>Rev 2035</th><th>CAGR</th><th>Needs</th><th>Gap</th><th>Return</th></tr></thead><tbody>`+
+    rows.slice(0,n).map(r=>{const b=r.base["2035"];
+      return `<tr><td class="l nm" title="${esc(r.n)}"><span class="tk">${r.t}</span> <span class="tiny">${esc(r.n)}</span></td>
+      <td>${fB(r.mc)}</td><td>${r.pe?r.pe.toFixed(1):"\u2014"}</td><td>${r.mg_used.toFixed(1)}%</td>
+      <td>${fB(b.rev)}</td><td>${sgn(b.cagr)}</td><td>${r.req_cagr==null?"\u2014":sgn(r.req_cagr)}</td>
+      <td style="color:${r.gap>0?"#3f7d33":"#b2452c"}">${r.gap==null?"\u2014":(r.gap>0?"+":"")+r.gap.toFixed(1)}pp</td>
+      <td style="color:${IRCOL(b.ir)};font-weight:700">${sgn(b.ir)}</td></tr>`;}).join("")+`</tbody></table>`;
+  const d=document.createElement("div");
+  d.innerHTML=`<h3>Cheapest vs. 2035 &mdash; clean margin anchor, no cycle flag</h3>${tbl(clean.slice().sort((a,b)=>b.base["2035"].ir-a.base["2035"].ir),14)}
+  <h3>The same ranking, restricted to the flagged names</h3>
+  <p class="tiny" style="margin-top:-4px">Either loss-making today, or running margins and growth that the model then
+  holds flat for nine years. Treat these as questions, not answers.</p>
+  ${tbl(big.filter(r=>r.assumed_mg||(r.cyc&&r.cyc.length)).sort((a,b)=>b.base["2035"].ir-a.base["2035"].ir),12)}
+  <h3>Dearest vs. 2035 &mdash; the price demands more than any scenario delivers</h3>
+  ${tbl(big.slice().sort((a,b)=>a.base["2035"].ir-b.base["2035"].ir),12)}`;
+  host.appendChild(d);
+  const f=document.createElement("p"); f.className="foot";
+  f.innerHTML=`<b>Read the gap column, not the return column.</b> Implied return inherits every assumption on slide 9;
+  the gap is the more robust statement, because it compares two numbers built the same way. And nothing here adjusts
+  for risk &mdash; PDD tops the clean table on arithmetic that takes no view on Chinese regulatory or delisting risk,
+  which is precisely why it trades at ${FBY["PDD"]?FBY["PDD"].pe.toFixed(1):""}&times; earnings while growing.
+  I am not a financial adviser and this is not advice; it is a transparent model you can disagree with by changing
+  the four assumptions on slide 9.`;
+  host.appendChild(f);
+  return host;
+}});
+
+/* ---------- deck plumbing ---------- */
+const deck=document.getElementById("deck"), dots=document.getElementById("dots"),
+      lab=document.getElementById("label"), prev=document.getElementById("prev"), next=document.getElementById("next");
+let cur=0; const built=[];
+slides.forEach((s,i)=>{
+  const d=document.createElement("div"); d.className="slide"; deck.appendChild(d); built.push(d);
+  const b=document.createElement("button"); b.className="dot"; b.title=s.label;
+  b.onclick=()=>go(i); dots.appendChild(b);
+});
+function go(i){
+  cur=Math.max(0,Math.min(slides.length-1,i)); hideTip();
+  built.forEach((d,j)=>d.classList.toggle("on",j===cur));
+  [...dots.children].forEach((d,j)=>d.classList.toggle("on",j===cur));
+  lab.textContent=`${cur+1} / ${slides.length} \u2014 ${slides[cur].label}`;
+  prev.disabled=cur===0; next.disabled=cur===slides.length-1;
+  const host=built[cur];
+  if(!host.dataset.done){
+    const out=slides[cur].build();
+    if(typeof out==="string") host.innerHTML=out; else host.appendChild(out);
+    host.dataset.done="1";
+  }
+  window.scrollTo({top:0,behavior:"instant"});
+}
+prev.onclick=()=>go(cur-1); next.onclick=()=>go(cur+1);
+addEventListener("keydown",e=>{
+  if(e.key==="ArrowRight"||e.key==="PageDown") go(cur+1);
+  if(e.key==="ArrowLeft"||e.key==="PageUp") go(cur-1);
+});
+go(0);
+console.log("deck ready:",slides.length,"slides,",ST.length,"stocks plotted,",DATA.excluded.length,"excluded");
+</script>
